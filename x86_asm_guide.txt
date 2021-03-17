@@ -133,6 +133,7 @@ https://stackoverflow.com/questions/8858104/64bit-nasm-division-idiv
 https://stackoverflow.com/questions/51564308/nasm-modulo-operation
 https://stackoverflow.com/questions/25489192/idiv-operation-in-assembly-understanding
 techbeamers.com/c-datatypes/
+https://www.cs.uaf.edu/2010/fall/cs301/lecture/10_04_malloc.html
 https://stackoverflow.com/questions/4175281/what-does-it-mean-to-align-the-stack
 align stack notes
 idiv cdq instruction notes
