@@ -1,0 +1,370 @@
+==================
+x86 Assembly Guide
+==================
+
+Reference intended for personal use.
+
+Adapted from https://cs.lmu.edu/~ray/notes/nasmtutorial/
+
+Program structure
+=================
+
+An assembly program is divided into three sections: text, data and bss. The text section is where you put code. The data section is reserved for initialized read-only data. The bss section is for uninitialized writeable data.
+
+Fundamental types and registers
+===============================
+
+byte: 8 bits
+word: 16 bits
+double word (dword): 32 bits
+quad word (qword): 64 bits
+double quad word: 128 bits
+
+Register set (64 bit version):
+
+R0   R1   R2   R3   R4   R5   R6   R7   R8   R9   R10   R11   R12   R13   R14   R15
+RAX  RCX  RDX  RBX  RSP  RBP  RSI  RDI
+
+The first eight registers have alternate names.
+
+Register set (32 bit version) (lower 32 bits of 64 bit registers):
+
+R0D  R1D  R2D  R3D  R4D  R5D  R6D  R7D  R8D  R9D  R10D  R11D  R12D  R13D  R14D  R15D
+EAX  ECX  EDX  EBX  ESP  EBP  ESI  EDI
+
+Register set (16 bit version) (lower 16 bits of 32 bit registers):
+
+R0W  R1W  R2W  R3W  R4W  R5W  R6W  R7W  R8W  R9W  R10W  R11W  R12W  R13W  R14W  R15W
+AX   CX   DX   BX   SP   BP   SI   DI
+
+Register set (8 bit version) (lower 8 bits of 16 bit registers):
+
+R0B  R1B  R2B  R3B  R4B  R5B  R6B  R7B  R8B  R9B  R10B  R11B  R12B  R13B  R14B  R15B
+AL   CL   DL   BL   SPL  BPL  SIL  DIL
+
+Register set (8 bit version) (upper 8 bits of 16 bit registers):
+
+AH   CH   DH   BH
+
+XMM register set (typically used for floating point arithmetic):
+
+XMM0 XMM1 XMM2 XMM3 XMM4 XMM5 XMM6 XMM7 XMM8 XMM9 XMM10 XMM11 XMM12 XMM13 XMM14 XMM15
+
+Things need to know about registers:
+IP = instruction pointer (program counter; usually stores address of the next instruction)
+SP = stack pointer
+BP = base pointer
+AX = accumulator (often used for storing results of arithmetic operations)
+BX = base register (often used for indexed addressing)
+CX = counter (often used for loop indexing)
+DX = data register (often used for IO operations; it's also used along with AX register for multiplication and division involving large values)
+SI = source index (for string operations)
+DI = destination index (for string operations)
+
+Details: https://www.tutorialspoint.com/assembly_programming/assembly_registers.htm
+
+Addressing modes
+================
+
+All possible memory addressing modes are:
+
+[ number ]
+[ reg ]
+[ reg + reg*scale ]
+[ reg + number ]
+[ reg + reg*scale + number ]
+
+Note that the scale is 1, 2, 4, or 8 only.
+
+Immediate values
+================
+
+Here are possible immediate values:
+
+200          ; decimal
+0200         ; still decimal - the leading 0 does not make it octal
+0200d        ; explicitly decimal - d suffix
+0d200        ; also decimal - 0d prefex
+0c8h         ; hex - h suffix, but leading 0 is required because c8h looks like a var
+0xc8         ; hex - the classic 0x prefix
+0hc8         ; hex - for some reason NASM likes 0h
+310q         ; octal - q suffix
+0q310        ; octal - 0q prefix
+11001000b    ; binary - b suffix
+0b1100_1000  ; binary - 0b prefix, and by the way, underscores are allowed
+
+Data and bss section
+====================
+
+Here are possible ways to set up values in data section:
+      db    0x55                ; just the byte 0x55
+      db    0x55,0x56,0x57      ; three bytes in succession
+      db    'a',0x55            ; character constants are OK
+      db    'hello',13,10,'$'   ; so are string constants
+      dw    0x1234              ; 0x34 0x12
+      dw    'a'                 ; 0x61 0x00 (it's just a number)
+      dw    'ab'                ; 0x61 0x62 (character constant)
+      dw    'abc'               ; 0x61 0x62 0x63 0x00 (string)
+      dd    0x12345678          ; 0x78 0x56 0x34 0x12
+      dd    1.234567e20         ; floating-point constant
+      dq    0x123456789abcdef0  ; eight byte constant
+      dq    1.234567e20         ; double-precision float
+      dt    1.234567e20         ; extended-precision float
+      
+Here are possible ways to set up values in bss section:
+      resb    64              ; reserve 64 bytes
+      resw    1               ; reserve a word
+      resq    10              ; array of ten reals
+
+Entry point
+===========
+
+The entry point for assembly program is _start. Note that is is NOT a function since its return address is not stored in stack, i.e. _start cannot be returned from.
+
+When using C library, you can use main instead of _start. C library provides boilerplate code for _start, which calls main (so main is a function). The main's return value will be stored in rax, which will be a parameter for exit library function (in exit function, program does cleanup like flushing io buffers then make an exit system call).
+
+When using main, you can exit using
+```
+        xor     rax,      rax      ; set exit code to zero
+        leave
+        ret
+```
+
+Here are interesting articles on how c programs work:
+- https://embeddedartistry.com/blog/2019/04/08/a-general-overview-of-what-happens-before-main/
+- http://dbp-consulting.com/tutorials/debugging/linuxProgramStartup.html
+
+Calling convention
+==================
+
+Calling convention is a binding contract all x86 assembly pro-gamers must sign before coding anything. It specifies what registers are preserved and not preserved across function calls. If you violate this contract, FBI will be on your doorstep. Each machine has its own calling convention but here we will focus on the one for System V AMD64 ABI.
+
+Terminology:
+callee saved registers: non-violate (non-forgettery) registers (these registers have same content before and after calls)
+caller saved registers: violate (forgettery) registers (these registers might have different content after calls)
+
+Register conventions (might be different for different platforms):
+rax - return value
+rcx - function argument 4
+rdx - function argument 3
+rsi - function argument 2
+rdi - function argument 1
+rsp - stack pointer
+r8  - function argument 5
+r9  - function argument 6
+
+Callee-saved registers: rbx, rsp, rbp, r12, r13, r14, r15
+Caller-saved registers: everything else
+
+Notes:
+- When doing syscall, put the syscall number in rax
+- Additional parameters are pushed on the stack, right to left, and are to be removed by the caller after the call.
+- After the parameters are pushed, the call instruction is made, so when the called function gets control, the return address is at [rsp], the first memory parameter is at [rsp+8], etc.
+- Integers are returned in rax or rdx:rax (functions might return 128-bit integers and in this case, rax stores lower 64-bits and rdx stores higher 64-bits).
+- For functions with variable arguments like printf, rax stores information about the number of vector registers used.
+
+More details: https://uclibc.org/docs/psABI-x86_64.pdf (pg. 22)
+
+Caller's responsibilities before call:
+1. Push all necessary caller-saved registers into the stack, since functions could modify these registers.
+2. Pass all necessary parameters to appropriate registers. Push additional parameters into the stack when necessary (in reverse order).
+3. For certain functions like printf, the stack pointer rsp must be aligned to a 16-byte boundary *right before* the call instruction is executed. That is, rsp%16==0 must be satisfied before call instruction. The process of making a call pushes the return address (8 bytes) on the stack. So when a function gets control, rsp is not aligned. You have to make that extra space yourself, by pushing something or subtracting 8 from rsp (when you do, rsp will be divisible by 16, since 8+8=16). Remember that main is also a function. Also, make sure you take account of the total size of extra values pushed in the stack from steps 1 and 2 when trying to align the stack. Also, if you have additional parameters in the stack, DON'T align the stack after pushing extra parameters -- do it before that.
+4. Invoke call instruction.
+
+Details for point 3: Generally, memory addressing is byte-based. So, each specific memory address houses a byte (BTW x86-based computers are little-endian). We say that an address is aligned by 16-bit (or 2-byte) boundary when the least significant bit of the address is zero (divisible by 2 or 0b10). Similarly, we say an address is aligned by 32-bit (or 4-byte) boundary when both the least significant bit and its next significant bit of the address is zero (divisble by 4 or 0b100). Similarly, we say an address is aligned by 64-bit (or 8-byte) boundary when the least significant three bits of the address is zero (divisble by 8 or 0b1000). Finally, we say an address is aligned by 128-bit (or 16-byte) boundary when the least significant four bits of the address is zero (divisble by 16 or 0b10000).
+
+Upon app entry (entering _start), you can expect the stack to be 16-byte aligned (sometimes not, so double check!). Note that since main is a function, entering the beginning main will cause the stack to be misaligned by 8 (in particular, rsp%16==8). Fortunately, rsp+8 is always 16-byte aligned, so you need to push something or subtracting 8 from rsp to align the stack (of course, don't forgot to undo these operations near the end of the function).
+
+Some instructions like SIMD ones require aligned stack.
+
+Examples:
+0x1234 aligned on both a 16 and 32 bit boundary but not 64 bit
+0x1235 not aligned (byte alignment really isn't a thing)
+0x1236 aligned on a 16 bit boundary
+0x1230 four zeros so 16, 32, 64, 128 BITS not bytes. 2,4,8,16 bytes.
+
+Learn more:
+- https://stackoverflow.com/questions/4175281/
+- https://www.isabekov.pro/stack-alignment-when-mixing-asm-and-c-code/
+
+Q: Uh, what happens if we don't know whether the stack pointer is aligned or not before trying to call a function?
+A: Consider this code for calling printf:
+```
+        ...
+        mov     rdi,      fmt      ; arg 1
+        mov     rsi,      rax      ; arg 2
+        xor     rax,      rax      ; since printf is varargs, so we need to clear rax
+        call    printf
+        ...
+```
+
+If we don't know whether rsp is aligned or not, we can perform bitwise and on rsp with -16 (0xFFFFFFFFFFFFFFF0 in 2's complement signed number system) to make sure it is aligned to 16-byte boundary (don't forgot to restore the old rsp after call!):
+```
+        ...
+        push    rbp
+        mov     rbp,      rsp
+        and     rsp,      -16      ; after this instruction, we can be certain that rsp%16==0
+        mov     rdi,      fmt      ; arg 1
+        mov     rsi,      rax      ; arg 2
+        xor     rax,      rax      ; since printf is varargs, so we need to clear rax
+        call    printf
+        mov     rsp,      rbp      ; restore the old rsp
+        pop     rbp
+        ...
+```
+
+Caller's responsibilities after call:
+1. Remove the additional parameters from the stack (if exists).
+2. Pop all caller-saved registers from the stack (in reverse order).
+
+Callee's responsibilities:
+1. Push rbp into the stack then put the value of rsp in rbp. The base pointer rbp will act as a reference point for finding parameters and local variables in the stack. We need to push rbp since it is the callee-saved register.
+2. If local variables are needed, we can allocate the space for them by decrementing the stack pointer. If we need 3 local 64-bit integers (8 bytes each), we will need to subtract rsp by 3*8=24 bytes.
+3. If the function will use any of the calle-saved registers, push them in the stack first.
+4. Leave the return value in rax register.
+5. Restore all callee-saved registers from step 3 by popping the stack.
+6. Deallocate all local variables from step 2 by adding the appropriate value to rsp (or use mov rsp, rbp).
+7. Pop rbp.
+8. Finish with ret.
+
+Let's consider this example program:
+
+```
+#include <stdio.h>
+
+long f(long a, long b, long c, long d, long e, long f, long g, long h) {
+    long xx = a * b * c * d * e * f * g * h;
+    long yy = xx + 1;
+    long zz = yy * 2;
+    return xx + yy + zz;
+}
+
+int main() {
+    printf("%d\n", f(3, 4, 5, 6, 7, 8, 9, 10));
+    return 0;
+}
+```
+
+The assembly prologue of the function f might look like:
+```
+f:
+        push    rbp
+        mov     rbp, rsp
+        sub     rsp, 24
+        push    r12
+        push    r13
+        ...
+```
+
+The state of the registers and the stack after executing the prologue would look like:
+
+state of the registers:
+rdi=a
+rsi=b
+rdx=c
+rcx=d
+r8=e
+r9=f
+
+state of the stack:
+        ...
+|    existing     |
+|  stack content  |
++-----------------+
+|       h         |
++-----------------+ rbp+24
+|       g         |
++-----------------+ rbp+16
+|     return      |
+|     address     |
++-----------------+ rbp+8
+|     old rbp     |
++-----------------+ rbp        <- rbp
+|       xx        |
++-----------------+ rbp-8
+|       yy        |
++-----------------+ rbp-16
+|       zz        |
++-----------------+ rbp-24
+|     old r12     |
++-----------------+ rbp-32
+|     old r13     |
++-----------------+ rbp-40     <- rsp
+|     red zone    |
++-----------------+
+|      other      |
+        ...
+
+Note that each "box" has the size of 8 bytes and the stack usually grow downward. Also, sometimes we require the stack pointer to be 16-byte aligned, and in this case, the address rbp+16 must be divisible by 16.
+
+Another note: The 128-byte area located right below rsp (from rsp-128 to rsp-1) also known as the "red zone." Leaf functions (functions that does not call other functions) can freely use this region of memory for temporary data storage, without using stack pointer. This allows compilers to optimize function code by removing instructions for incrementing and decrementing rsp. Also, since the red zone is relative to rsp, does it move downward with each push and does it move upward with each pop.
+
+See call_convention_example.asm to learn more. Also check pi.asm and sort.asm.
+
+Details:
+- https://flint.cs.yale.edu/cs421/papers/x86-asm/asm.html#calling (it uses a bit different calling convention but the basic idea is the same)
+- https://eli.thegreenplace.net/2011/09/06/stack-frame-layout-on-x86-64/
+
+Basic instructions to know
+==========================
+adc = Integer addition with carry
+add = Integer addition
+and = Bitwise AND
+bs[f|r] = Bit scan forward, bit scan reverse
+b[t|tr|ts] = Bit test; Bit test and reset; Bit test and set
+call = Call procedure
+cld = Clear direction flag (RFLAGS.DF)
+cmovcc = Conditional move
+cmp = Compare operands
+cmps[b|w|d|q] = Compare string operands
+cupid = Query CPU identification and feature information
+c[wd|dq|do] = Convert operand
+dec = Decrement operand by 1
+div = Unsigned integer division
+idiv = Signed integer division
+imul = Signed integer multiplication
+inc = Increment operand by 1
+jcc = Conditional jump
+jmp = Unconditional jump
+lahf = Load status flags into register AH
+lea = Load effective address
+lods[b|w|d|q] = Load string operand
+mov = Move data
+mov[sx|sxd] = Move integer with sign extension
+movzx = Move integer with zero extension
+mul = Unsigned integer multiplication
+neg = Two’s complement negation
+not = One’s complement negation
+or = Bitwise inclusive OR
+pop = Pop top-of-stack value to operand
+popfq = Pop top-of-stack value to RFLAGS
+push = Push operand onto stack
+pushfq = Push RFLAGS onto stack
+rc[l|r] = Rotate left with RFLAGS.CF; Rotate right with RFLAGS.CF
+ret = Return from procedure
+re[p|pe|pz|pne|pnz] = Repeat string operation (instruction prefix)
+ro[l|r] = Rotate left; Rotate right
+sahf = Store AH into status flags
+sar = Shift arithmetic right
+setcc = Set byte on condition
+sh[l|r] = Shift logical left; Shift logical right
+sbb = Integer subtraction with borrow
+std = Set direction flag (RFLAGS.DF)
+stos[b|w|d|q] = Store string value
+test = Test operand (sets status flags)
+xchg = Exchange source and destination operand values
+xor = Bitwise exclusive OR
+
+Additional resources
+====================
+
+Books:
+Modern x86 Assembly Programming by Daniel Kusswurm
+
+Useful guides:
+- https://www.cs.virginia.edu/~evans/cs216/guides/x86.html
+- https://www.avabodh.com/cin/cin.html
+
+Some tips
+=========
+- Prefer 64-bit addressing modes

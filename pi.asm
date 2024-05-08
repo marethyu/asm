@@ -3,10 +3,10 @@
 ;                                    By Jimmy Y.
 ;
 ; compile and run:
-; $ nasm -f elf64 pi.asm && gcc -m64 -o pi pi.o && ./pi
+; $ nasm -f elf64 pi.asm && gcc -no-pie -fno-pie -o pi pi.o && ./pi
 ;
 ; debug:
-; $ nasm -f elf64 -g -F dwarf  pi.asm && gcc -m64 -o pi pi.o && gdb ./pi
+; $ nasm -f elf64 -g -F dwarf pi.asm && gcc -no-pie -fno-pie -o pi pi.o && gdb ./pi
 ; ----------------------------------------------------------------------------------------
 
         bits    64
@@ -15,10 +15,10 @@
 
         section .text
 main:
-        push    rbp
-        push    rbx
-        mov     rbp, rsp
-        sub     rsp, 11216
+        push    rbp                   ; this is a calle-saved register; since we are going to use it, we need to preserve it (main is also a function!)
+        mov     rbp, rsp              ; rbp is a reference point for local variable access
+        sub     rsp, 11204            ; allocate space for array of 2801 integers (4 bytes each)
+        push    rbx                   ; this is a calle-saved register; since we are going to use it, we need to preserve it
 
         mov     r12d, 10000           ; int a = 10000;
         xor     r13d, r13d            ; int e = 0;
@@ -84,10 +84,15 @@ loop3_end:
         mov     r13d, edx             ; e = d % a;
 
 ; printf("%.4d", e + d / a);
+        push    rbp
+        mov     rbp, rsp
+        and     rsp, -16              ; align stack
         mov     rdi, fmt
         mov     esi, eax
         xor     rax, rax
         call    printf
+        mov     rsp, rbp              ; restore old rsp
+        pop     rbp
 
         pop     rcx
         sub     ecx, 14
@@ -95,14 +100,19 @@ loop3_end:
         jnz     loop2
 
 ; putchar('\n');
+        push    rbp
+        mov     rbp, rsp
+        and     rsp, -16              ; align stack
         mov     rdi, 10
         call    putchar
-
-        pop     rbx
+        mov     rsp, rbp              ; restore old rsp
         pop     rbp
-        mov     rax, 60
-        xor     rdi, rdi
-        syscall
+
+        xor     rax, rax              ; set exit code to 0
+        pop     rbx                   ; restore old rbx
+        add     rsp, 11204            ; deallocate the array
+        pop     rbp
+        ret
 
         section .data
 fmt:    db      "%.4d", 0

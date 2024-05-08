@@ -1,6 +1,6 @@
 ; Example showing how to use printf if you have more than 6 arguments.
 ;
-; $ nasm -f elf64 printf2.asm && gcc -m64 -o printf2 printf2.o && ./printf2
+; $ nasm -f elf64 printf2.asm && gcc -no-pie -fno-pie -o printf2 printf2.o && ./printf2
 
     bits 64
     global main
