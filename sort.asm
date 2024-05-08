@@ -8,6 +8,7 @@
         extern  printf
         extern  scanf
         extern  malloc
+        extern  free
 
         section .text
 sort:
@@ -94,6 +95,10 @@ quit_loop1:
         call    sort
 
 ; output the array
+        mov     rdi,         msg
+        xor     rax,         rax
+        call    printf
+
         mov     rcx,         0
 loop2:
         cmp     rcx,         [rbp-8]
@@ -110,6 +115,10 @@ loop2:
         jmp     loop2
 quit_loop2:
 
+; we are done, so free the array
+        mov     rdi,         rbx
+        call    free
+
         xor     rax,         rax             ; set exit code to zero
         pop     rbx
         add     rsp,         8               ; remove 'n'
@@ -119,4 +128,5 @@ quit_loop2:
 
         section .data
 fmt1:   db      "%d", 0                   ; "%d\0"
+msg:    db      "sorted array:", 10, 0    ; "sorted array:\n\0"
 fmt2:   db      "%d", 10, 0               ; "%d\n\0"

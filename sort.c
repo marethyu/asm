@@ -45,5 +45,7 @@ int main()
         printf("%d\n", arr[i]);
     }
 
+    free(arr);
+
     return 0;
 }
